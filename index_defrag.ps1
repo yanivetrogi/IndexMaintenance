@@ -13,12 +13,20 @@
     None
 
 .NOTES
-  This script can be usefull and practical for VLDBs where the available maintenance window is never enough to complete the Index Maitenance tasks
-  Whatch out for the value asigned to $MaxThreads and validate that it matches your enviroment for 2 main things:
-  1. Disk letancy (do not overload the disk subsystem in order not to negetivly effect other processes that may be running on the system )
-  2. Always On availability groups (verify there is no latency to Secondary Replica(s) )
+  This script can be usefull and practical for VLDBs where the available maintenance window is never enough to complete the Index Maitenance tasks.
+  Whatch out for the value asigned to $MaxThreads and validate that it matches your enviroment for the following points:
+  1. Disk latancy (do not overload the disk subsystem in order not to negetivly effect other processes that may be running on the system )
+  2. Always On availability groups - verify there is no latency to Secondary Replica(s) 
+  3. Transactional Replication - be aware that the LogReader may not be able to keep up with the high number of log records generated resulting in a state where Subcriber(s) fall behind the Publisher
+     (using ONLINE=1 generates much more log records)
+  4. Do not stay obligeaged to the values addopted by the community as the best practicies but adjust for your enviroment. 
+     For example if you cant REBUILD ONLINE due to Edition limmitation and the process introduces database contention you can aim towards REORGANIZE only etc.
+  5. The ConnectionString is hard coded within the ps script and uses Integrated Security (Windows Authentication).
+     In case SQL Authentication is required there is an example commented out
+  6. The Application Name=index_defrag in the connection string allows for easy tracking using SQL Trace, Profiler and XE
+  7. Running the script with the @debug = 1 will result in prining only with nothing gets executed  
 
-  Modify the parameters asigned to the stored procedure sp_index_defrag to meet your needs (at the moment the values are hard coded)
+  Modify the parameters asigned to the stored procedure sp_index_defrag to meet your needs (at the moment the values are hard coded within the ps script)
 
 #>
 
@@ -30,13 +38,14 @@
 [string]$Server = $env:COMPUTERNAME; 
 
 
+# Get the list of databases.
 #region <databases>
 $Database = 'master';
-$CommandText = 'SELECT name FROM sys.databases WHERE database_id > 4 ORDER BY name;';
+$CommandText = 'SELECT name FROM sys.databases WHERE database_id > 4 /* AND name NOT IN ('') */ ORDER BY name;';
 $ConnectionString = "Server=$Server; Database=$Database; Integrated Security=True; Application Name=index_defrag;";
+#$ConnectionString = "Server=$Server; Database=$Database; Integrated Security=False; User=MyUser; Password=MyPassword; Application Name=index_defrag;";
 [System.Data.DataSet]$ds_Databases = New-Object System.Data.DataSet;
 
-# Get the list of databases.
 try
 {
     $SqlConnection = New-Object System.Data.SqlClient.SqlConnection($ConnectionString);
@@ -69,7 +78,8 @@ foreach($Row in $ds_Databases.Tables[0].Rows)
        $SqlCommand = $sqlConnection.CreateCommand();
        $SqlConnection.Open();
        $SqlCommand.CommandText = $CommandText;
-       # Get the number of rows to be used as the upper bound of the loop.
+
+       # Get the number of rows to be used as the upper boundry of the loop.
        $NumRows = $SqlCommand.ExecuteScalar();      
     }
     catch {throw $_ };
@@ -100,6 +110,7 @@ foreach($Row in $ds_Databases.Tables[0].Rows)
        catch {throw $_ };
     }
 
+    # Create the threads
     $RunspacePool = [runspacefactory]::CreateRunspacePool(1, $MaxThreads);
     $RunspacePool.Open();
     $Jobs = @();
@@ -110,6 +121,7 @@ foreach($Row in $ds_Databases.Tables[0].Rows)
        $PowerShell.AddScript($ScriptBlock).AddParameter("CommandText",$CommandText).AddParameter("ConnectionString",$ConnectionString)
        $Jobs += $PowerShell.BeginInvoke();       
     }    
+    # Wait utill all threads have completed
     while ($Jobs.IsCompleted -contains $false)
     {        
        Start-Sleep -Milliseconds 10;       
