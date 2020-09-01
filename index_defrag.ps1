@@ -12,19 +12,21 @@
 .OUTPUTS
     None
 
+    
 .NOTES
-  This script can be usefull and practical for VLDBs where the available maintenance window is never enough to complete the Index Maitenance tasks.
-  Whatch out for the value asigned to $MaxThreads and validate that it matches your enviroment for the following points:
-  1. Disk latancy (do not overload the disk subsystem in order not to negetivly effect other processes that may be running on the system )
+  This script can be useful and practical for VLDBs where the available maintenance window is never enough to complete the Index Maitenance tasks.
+  Watch out for the value assigned to $MaxThreads and validate that it matches your environment for the following points:
+  1. Disk latency (do not overload the disk subsystem in order not to negatively effect other processes that may be running on the system )
   2. Always On availability groups - verify there is no latency to Secondary Replica(s) 
-  3. Transactional Replication - be aware that the LogReader may not be able to keep up with the high number of log records generated resulting in a state where Subcriber(s) fall behind the Publisher
+  3. Transactional Replication - be aware that the LogReader may not be able to keep up with the high number of log records generated resulting in a state where Subscriber(s) fall behind the Publisher
      (using ONLINE=1 generates much more log records)
-  4. Do not stay obligeaged to the values addopted by the community as the best practicies but adjust for your enviroment. 
-     For example if you cant REBUILD ONLINE due to Edition limmitation and the process introduces database contention you can aim towards REORGANIZE only etc.
+  4. Do not stay obligated to the values adopted by the community as the best practices but adjust for your environment. 
+     For example if you cant REBUILD ONLINE due to Edition limitation and the process introduces database contention you can aim towards REORGANIZE only etc.
   5. The ConnectionString is hard coded within the ps script and uses Integrated Security (Windows Authentication).
      In case SQL Authentication is required there is an example commented out
   6. The Application Name=index_defrag in the connection string allows for easy tracking using SQL Trace, Profiler and XE
-  7. Running the script with the @debug = 1 will result in prining only with nothing gets executed  
+  7. Running the script with the @debug = 1 will result in printing only with nothing gets executed  
+
 
   Modify the parameters asigned to the stored procedure sp_index_defrag to meet your needs (at the moment the values are hard coded within the ps script)
 
